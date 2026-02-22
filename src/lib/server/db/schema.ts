@@ -69,6 +69,7 @@ export const users = pgTable('users', {
 	organizationId: integer('organization_id')
 		.notNull()
 		.references(() => organizations.id),
+	firebaseUid: text('firebase_uid').unique(),
 	firstName: text('first_name').notNull(),
 	lastName: text('last_name').notNull(),
 	phone: text('phone'),

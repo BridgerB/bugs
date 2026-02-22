@@ -3,8 +3,10 @@ import postgres from 'postgres';
 import * as schema from './schema';
 import { env } from '$env/dynamic/private';
 
-if (!env.DATABASE_URL) throw new Error('DATABASE_URL is not set');
+if (!env.ADMIN) throw new Error('ADMIN env var is not set');
 
-const client = postgres(env.DATABASE_URL);
+const { databaseUrl } = JSON.parse(env.ADMIN);
+
+const client = postgres(databaseUrl);
 
 export const db = drizzle(client, { schema });

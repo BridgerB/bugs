@@ -14,10 +14,20 @@ export const customerSourceEnum = pgEnum('customer_source', [
 ]);
 
 export const jobStatusEnum = pgEnum('job_status', [
+	'estimate',
 	'scheduled',
 	'in_progress',
 	'completed',
 	'cancelled'
+]);
+
+export const deviceStatusEnum = pgEnum('device_status', ['active', 'needs_service', 'removed']);
+
+export const attachableTypeEnum = pgEnum('attachable_type', [
+	'job',
+	'property',
+	'customer',
+	'device'
 ]);
 
 export const subscriptionFrequencyEnum = pgEnum('subscription_frequency', [
@@ -215,5 +225,51 @@ export const communications = pgTable('communications', {
 	subject: text('subject'),
 	body: text('body'),
 	sentAt: timestamp('sent_at').notNull().defaultNow(),
+	createdAt: timestamp('created_at').notNull().defaultNow()
+});
+
+export const devices = pgTable('devices', {
+	id: serial('id').primaryKey(),
+	organizationId: integer('organization_id')
+		.notNull()
+		.references(() => organizations.id),
+	propertyId: integer('property_id')
+		.notNull()
+		.references(() => properties.id),
+	serviceId: integer('service_id').references(() => services.id),
+	name: text('name').notNull(),
+	location: text('location'),
+	status: deviceStatusEnum('status').notNull().default('active'),
+	installedAt: timestamp('installed_at'),
+	lastServicedAt: timestamp('last_serviced_at'),
+	notes: text('notes'),
+	createdAt: timestamp('created_at').notNull().defaultNow()
+});
+
+export const attachments = pgTable('attachments', {
+	id: serial('id').primaryKey(),
+	organizationId: integer('organization_id')
+		.notNull()
+		.references(() => organizations.id),
+	attachableType: attachableTypeEnum('attachable_type').notNull(),
+	attachableId: integer('attachable_id').notNull(),
+	storagePath: text('storage_path').notNull(),
+	fileName: text('file_name').notNull(),
+	contentType: text('content_type'),
+	createdAt: timestamp('created_at').notNull().defaultNow()
+});
+
+export const pay = pgTable('pay', {
+	id: serial('id').primaryKey(),
+	organizationId: integer('organization_id')
+		.notNull()
+		.references(() => organizations.id),
+	userId: integer('user_id')
+		.notNull()
+		.references(() => users.id),
+	jobId: integer('job_id').references(() => jobs.id),
+	amount: integer('amount').notNull(),
+	notes: text('notes'),
+	paidAt: timestamp('paid_at'),
 	createdAt: timestamp('created_at').notNull().defaultNow()
 });

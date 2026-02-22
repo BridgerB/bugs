@@ -1,6 +1,17 @@
-import { pgTable, serial, text, timestamp, pgEnum, integer } from 'drizzle-orm/pg-core';
+import { pgTable, serial, text, timestamp, pgEnum, integer, numeric } from 'drizzle-orm/pg-core';
+
+// Enums
 
 export const userRoleEnum = pgEnum('user_role', ['admin', 'technician']);
+
+export const customerSourceEnum = pgEnum('customer_source', [
+	'referral',
+	'google',
+	'facebook',
+	'door_knock',
+	'website',
+	'phone'
+]);
 
 export const jobStatusEnum = pgEnum('job_status', [
 	'scheduled',
@@ -8,6 +19,34 @@ export const jobStatusEnum = pgEnum('job_status', [
 	'completed',
 	'cancelled'
 ]);
+
+export const subscriptionFrequencyEnum = pgEnum('subscription_frequency', [
+	'weekly',
+	'biweekly',
+	'monthly',
+	'quarterly',
+	'annually'
+]);
+
+export const subscriptionStatusEnum = pgEnum('subscription_status', [
+	'active',
+	'paused',
+	'cancelled'
+]);
+
+export const invoiceStatusEnum = pgEnum('invoice_status', [
+	'draft',
+	'sent',
+	'paid',
+	'overdue',
+	'void'
+]);
+
+export const paymentMethodEnum = pgEnum('payment_method', ['cash', 'check', 'card']);
+
+export const communicationTypeEnum = pgEnum('communication_type', ['email', 'text', 'phone']);
+
+// Tables
 
 export const organizations = pgTable('organizations', {
 	id: serial('id').primaryKey(),
@@ -37,6 +76,19 @@ export const customers = pgTable('customers', {
 	lastName: text('last_name').notNull(),
 	phone: text('phone'),
 	email: text('email'),
+	source: customerSourceEnum('source'),
+	notes: text('notes'),
+	createdAt: timestamp('created_at').notNull().defaultNow()
+});
+
+export const properties = pgTable('properties', {
+	id: serial('id').primaryKey(),
+	organizationId: integer('organization_id')
+		.notNull()
+		.references(() => organizations.id),
+	customerId: integer('customer_id')
+		.notNull()
+		.references(() => customers.id),
 	address: text('address'),
 	city: text('city'),
 	state: text('state'),
@@ -45,7 +97,83 @@ export const customers = pgTable('customers', {
 	createdAt: timestamp('created_at').notNull().defaultNow()
 });
 
+export const services = pgTable('services', {
+	id: serial('id').primaryKey(),
+	organizationId: integer('organization_id')
+		.notNull()
+		.references(() => organizations.id),
+	name: text('name').notNull(),
+	description: text('description'),
+	defaultPrice: integer('default_price'),
+	createdAt: timestamp('created_at').notNull().defaultNow()
+});
+
+export const subscriptions = pgTable('subscriptions', {
+	id: serial('id').primaryKey(),
+	organizationId: integer('organization_id')
+		.notNull()
+		.references(() => organizations.id),
+	propertyId: integer('property_id')
+		.notNull()
+		.references(() => properties.id),
+	serviceId: integer('service_id')
+		.notNull()
+		.references(() => services.id),
+	frequency: subscriptionFrequencyEnum('frequency').notNull(),
+	startDate: timestamp('start_date').notNull(),
+	nextServiceDate: timestamp('next_service_date'),
+	preferredTechnicianId: integer('preferred_technician_id').references(() => users.id),
+	status: subscriptionStatusEnum('status').notNull().default('active'),
+	notes: text('notes'),
+	createdAt: timestamp('created_at').notNull().defaultNow()
+});
+
+export const products = pgTable('products', {
+	id: serial('id').primaryKey(),
+	organizationId: integer('organization_id')
+		.notNull()
+		.references(() => organizations.id),
+	name: text('name').notNull(),
+	description: text('description'),
+	unit: text('unit'),
+	createdAt: timestamp('created_at').notNull().defaultNow()
+});
+
 export const jobs = pgTable('jobs', {
+	id: serial('id').primaryKey(),
+	organizationId: integer('organization_id')
+		.notNull()
+		.references(() => organizations.id),
+	propertyId: integer('property_id')
+		.notNull()
+		.references(() => properties.id),
+	serviceId: integer('service_id')
+		.notNull()
+		.references(() => services.id),
+	subscriptionId: integer('subscription_id').references(() => subscriptions.id),
+	technicianId: integer('technician_id')
+		.notNull()
+		.references(() => users.id),
+	status: jobStatusEnum('status').notNull().default('scheduled'),
+	scheduledDate: timestamp('scheduled_date').notNull(),
+	completedDate: timestamp('completed_date'),
+	notes: text('notes'),
+	createdAt: timestamp('created_at').notNull().defaultNow()
+});
+
+export const jobProducts = pgTable('job_products', {
+	id: serial('id').primaryKey(),
+	jobId: integer('job_id')
+		.notNull()
+		.references(() => jobs.id),
+	productId: integer('product_id')
+		.notNull()
+		.references(() => products.id),
+	quantity: numeric('quantity'),
+	notes: text('notes')
+});
+
+export const invoices = pgTable('invoices', {
 	id: serial('id').primaryKey(),
 	organizationId: integer('organization_id')
 		.notNull()
@@ -53,13 +181,39 @@ export const jobs = pgTable('jobs', {
 	customerId: integer('customer_id')
 		.notNull()
 		.references(() => customers.id),
-	technicianId: integer('technician_id')
+	jobId: integer('job_id').references(() => jobs.id),
+	amount: integer('amount').notNull(),
+	status: invoiceStatusEnum('status').notNull().default('draft'),
+	dueDate: timestamp('due_date'),
+	sentAt: timestamp('sent_at'),
+	createdAt: timestamp('created_at').notNull().defaultNow()
+});
+
+export const payments = pgTable('payments', {
+	id: serial('id').primaryKey(),
+	organizationId: integer('organization_id')
 		.notNull()
-		.references(() => users.id),
-	status: jobStatusEnum('status').notNull().default('scheduled'),
-	scheduledDate: timestamp('scheduled_date').notNull(),
-	completedDate: timestamp('completed_date'),
-	pestType: text('pest_type'),
-	notes: text('notes'),
+		.references(() => organizations.id),
+	invoiceId: integer('invoice_id')
+		.notNull()
+		.references(() => invoices.id),
+	amount: integer('amount').notNull(),
+	method: paymentMethodEnum('method'),
+	paidAt: timestamp('paid_at').notNull().defaultNow(),
+	createdAt: timestamp('created_at').notNull().defaultNow()
+});
+
+export const communications = pgTable('communications', {
+	id: serial('id').primaryKey(),
+	organizationId: integer('organization_id')
+		.notNull()
+		.references(() => organizations.id),
+	customerId: integer('customer_id')
+		.notNull()
+		.references(() => customers.id),
+	type: communicationTypeEnum('type').notNull(),
+	subject: text('subject'),
+	body: text('body'),
+	sentAt: timestamp('sent_at').notNull().defaultNow(),
 	createdAt: timestamp('created_at').notNull().defaultNow()
 });
